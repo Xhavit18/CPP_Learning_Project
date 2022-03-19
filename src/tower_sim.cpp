@@ -34,6 +34,7 @@ void TowerSimulation::create_keystrokes()
 
     GL::keystrokes.emplace('a', []() { GL::change_framerate_minus(); });
     GL::keystrokes.emplace('b', []() { GL::change_framerate_plus(); });
+    GL::keystrokes.emplace('p', []() { GL::pause(); });
 
     GL::keystrokes.emplace('0', [this]() { aircraftManager.numberAircraftAirline(0); });
     GL::keystrokes.emplace('1', [this]() { aircraftManager.numberAircraftAirline(1); });

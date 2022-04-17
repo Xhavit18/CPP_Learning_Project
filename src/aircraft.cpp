@@ -49,6 +49,7 @@ void Aircraft::arrive_at_terminal()
     // we arrived at a terminal, so start servicing
     control.arrived_at_terminal(*this);
     is_at_terminal = true;
+    //was_at_airport = true;
 }
 
 // deploy and retract landing gear depending on next waypoints
@@ -69,16 +70,17 @@ void Aircraft::operate_landing_gear()
             std::cout << flight_number << " is now landing..." << std::endl;
             landing_gear_deployed = true;
         }
-        else if (!ground_before && !ground_after)
+        else if (!ground_before)
         {
             landing_gear_deployed = false;
         }
     }
 }
 
-void Aircraft::add_waypoint(const Waypoint& wp, const bool front)
+template <bool front>
+void Aircraft::add_waypoint(const Waypoint& wp)
 {
-    if (front)
+    if constexpr (front)
     {
         waypoints.push_front(wp);
     }
@@ -90,9 +92,24 @@ void Aircraft::add_waypoint(const Waypoint& wp, const bool front)
 
 void Aircraft::move()
 {
+
+    if (is_circling() && !has_terminal()){
+        WaypointQueue waypointQueue = control.reserve_terminal(*this);
+        if (!waypointQueue.empty()){
+            waypoints = std::move(waypointQueue);
+        }
+    }
+
     if (waypoints.empty())
     {
-        waypoints = control.get_instructions(*this);
+        if (was_at_airport){
+            can_destroy = true;
+            return;
+        }
+        for (const auto& wp: control.get_instructions(*this))
+        {
+            add_waypoint<false>(wp);
+        }
     }
 
     if (!is_at_terminal)
@@ -101,7 +118,7 @@ void Aircraft::move()
         // move in the direction of the current speed
         pos += speed;
 
-        // if we are close to our next waypoint, stike if off the list
+        // if we are close to our next waypoint, strike if off the list
         if (!waypoints.empty() && distance_to(waypoints.front()) < DISTANCE_THRESHOLD)
         {
             if (waypoints.front().is_at_terminal())
@@ -131,6 +148,14 @@ void Aircraft::move()
             {
                 pos.z() -= SINK_FACTOR * (SPEED_THRESHOLD - speed_len);
             }
+            if (fuel != 0.f){
+                fuel--;
+            }
+            if (fuel <= 0.f){
+                can_destroy = true;
+                control.delete_crashed_aircraft(*this);
+                throw AircraftCrash("Aircraft " + flight_number + " ran out of fuel! RIP");
+            }
         }
 
         // update the z-value of the displayable structure
@@ -141,4 +166,30 @@ void Aircraft::move()
 void Aircraft::display() const
 {
     type.texture.draw(project_2D(pos), { PLANE_TEXTURE_DIM, PLANE_TEXTURE_DIM }, get_speed_octant());
+}
+
+bool Aircraft::delete_asap() const
+{
+    return can_destroy;
+}
+
+bool Aircraft::has_terminal() const
+{
+    return !waypoints.empty() && waypoints.back().is_at_terminal();
+}
+
+bool Aircraft::is_circling() const
+{
+    return !is_on_ground() && !was_at_airport;
+}
+void Aircraft::refill(float& fuel_stock)
+{
+    assert(fuel_stock >= 0.f);
+    const auto refill = 3000 - fuel > fuel_stock ? fuel_stock : 3000 - fuel;
+    fuel += refill;
+    fuel_stock -= refill;
+    if (refill > 0.f)
+    {
+        std::cout << flight_number << " was refilled with " << refill << " units of fuel" << std::endl;
+    }
 }

@@ -26,9 +26,12 @@ add_executable(tower
 	src/tower_sim.hpp
 	src/tower.cpp
 	src/tower.hpp
+	src/AircraftManager.cpp
+	src/AircraftManager.hpp
 	src/waypoint.hpp
 	src/main.cpp
-)
+    src/AircraftFactory.cpp
+	src/AircraftFactory.hpp)
 
 ###################
 # Compile options #

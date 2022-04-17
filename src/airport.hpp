@@ -9,6 +9,7 @@
 #include "runway.hpp"
 #include "terminal.hpp"
 #include "tower.hpp"
+#include "AircraftManager.hpp"
 
 #include <vector>
 
@@ -20,6 +21,10 @@ private:
     const GL::Texture2D texture;
     std::vector<Terminal> terminals;
     Tower tower;
+    float fuel_stock = 0;
+    float ordered_fuel = 0;
+    float next_refill_time = 0;
+    const AircraftManager &aircraftManager;
 
     // reserve a terminal
     // if a terminal is free, return
@@ -45,19 +50,23 @@ private:
 
     WaypointQueue start_path(const size_t terminal_number)
     {
+        assert(terminal_number < terminals.size());
         return type.terminal_to_air(pos, 0, terminal_number);
     }
 
     Terminal& get_terminal(const size_t terminal_num) { return terminals.at(terminal_num); }
 
+    void free_term(const size_t terminal_number) { terminals.at(terminal_number).free(); }
+
 public:
-    Airport(const AirportType& type_, const Point3D& pos_, const img::Image* image, const float z_ = 1.0f) :
+    Airport(const AirportType& type_, const Point3D& pos_, const img::Image* image, const AircraftManager& aircraftManager, const float z_ = 1.0f) :
         GL::Displayable { z_ },
         type { type_ },
         pos { pos_ },
         texture { image },
         terminals { type.create_terminals() },
-        tower { *this }
+        tower { *this },
+        aircraftManager {aircraftManager}
     {}
 
     Tower& get_tower() { return tower; }
@@ -66,9 +75,20 @@ public:
 
     void move() override
     {
-        for (auto& t : terminals)
-        {
-            t.move();
+
+        if(next_refill_time <= 0.f){
+
+            auto required_fuel = aircraftManager.get_required_fuel();
+            ordered_fuel = required_fuel < 5000 ? required_fuel : 5000;
+            fuel_stock += ordered_fuel;
+            /*std::cout << "Fuel stock : " << fuel_stock
+                      << ", Needed fuel : " << required_fuel
+                      << ", Received fuel : " << ordered_fuel << std::endl;*/
+            next_refill_time = 100.f;
+        }
+        next_refill_time--;
+        for (auto& terminal: terminals){
+            terminal.move(fuel_stock);
         }
     }
 
